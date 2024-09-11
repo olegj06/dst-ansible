@@ -1,0 +1,107 @@
+---
+# tasks file for mysql
+
+- name: Installation de pip
+  apt:
+   name: python3-pip
+   state: present
+  when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
+
+- name: Installation de pip
+  dnf:
+   name: python3-pip
+   state: present
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+
+- name: Install PyMySQL
+  pip:
+   name: pymysql
+   executable : pip3
+   state: present
+
+- name: Installation de mysql-server
+  apt:
+    pkg: mysql-server
+    update_cache: yes
+    cache_valid_time: 86400
+    state: present
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Installation de mariadb-server
+  apt:
+    pkg: mariadb-server
+    update_cache: yes
+    cache_valid_time: 86400
+    state: present
+  when: ansible_distribution == 'Debian'
+
+- name: Installation de mariadb-server
+  dnf:
+    pkg: mariadb-server
+    update_cache: yes
+    state: present
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+
+
+- name: Démarrer MariaDB
+  sysvinit:
+    state: started       
+    name: mysql 
+    enabled: true
+
+# random test
+#- name: print localhost hostvars
+#  debug:
+#    msg: "{{ hostvars['localhost'] }}"
+
+- name: Créer une base de données mysql
+  mysql_db:
+    name: "{{ wp_mysql_db }}"
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+#pour aws
+#- name: Créer un utilisateur mysql
+#  mysql_user:
+#    name: "{{ wp_mysql_user }}"
+#    password: "{{ wp_mysql_password }}"
+#    priv: "*.*:ALL"
+#    host: "{{ wp_host }}"
+#    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+#pour molecule
+- name: Créer un utilisateur mysql
+  mysql_user:
+    name: "{{ wp_mysql_user }}"
+    password: "{{ wp_mysql_password }}"
+    priv: "*.*:ALL"
+    host: "{{ wp_ip }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+
+
+
+
+# ne fonctionne sous molecule pas possible d'editer ce fichier en live   
+#- name: Ajouter le serveur wordpress  à /etc/hosts
+#  lineinfile:
+#    path: "/etc/hosts"
+#    line: "{{ wp_ip }}  {{ wp_host }}"
+
+#molecule n'en tient meme pas compte ;))
+- name: Modify /etc/hosts
+  ansible.builtin.command: 'echo "{{ wp_ip }}  {{ wp_host }}" >> /etc/hosts'
+    
+- name: Commenter la ligne bind-address dans /etc/mysql/mysql.conf.d/mysqld.cnf
+  lineinfile:
+    path: /etc/mysql/mysql.conf.d/mysqld.cnf
+    regexp: '^bind-address\s*='
+    line: '# bind-address = 127.0.0.1'
+   
+- name: Redemarrer le serveur mysql
+  sysvinit:
+    state: restarted
+    name: mysql
+    enabled: true
+
+

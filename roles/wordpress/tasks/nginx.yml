@@ -1,0 +1,89 @@
+---
+#pour Ubuntu & Debian
+- name: WordPress | Nginx | Déterminer l'emplacement du socket PHP FPM
+  shell: dpkg -l | grep php-fpm  | awk '{print $3}' | grep -o '[0-9]\.[0-9]' | head -n 1
+  register: php_ver_output
+  when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
+     
+  
+
+#pour CentOS & Redhat
+- name: WordPress | Nginx | Déterminer l'emplacement du socket PHP FPM
+  shell: rpm -qa | grep php-fpm  | awk '{print $3}' | grep -o '[0-9]\.[0-9]' | head -n 1
+  register: php_ver
+  when: ansible_distribution == 'CentOS' or  ansible_distribution == 'RedHat'
+
+ 
+
+#pour Ubuntu & Debian
+- name: Démarrer le service php{{ php_ver_output.stdout }}-fpm
+  sysvinit:
+    name: "php{{ php_ver_output.stdout }}-fpm"
+    state: started
+  when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
+
+#pour Centos & RedHad
+- name: Démarrer le service php-fpm{{ php_ver_output.stdout }}
+  service:
+    name: "php-fpm"
+    state: started
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+
+
+
+- name: Démarrer le service nginx
+  sysvinit:
+    name: "nginx"
+    state: started
+    enabled: true
+
+
+- name: WordPress | Nginx | Copier le fichier de configuration de l'hôte virtuel
+  template:
+    src: "nginx-vhost.j2"
+    dest: "/etc/nginx/sites-available/{{ wp_sitename }}"
+    owner: root
+    group: root
+    mode: 0644
+
+
+
+
+- name: WordPress | Nginx | Fichier de configuration de l'hôte virtuel Symlink des sites disponibles aux sites activés
+  file:
+    state: link
+    src: "/etc/nginx/sites-available/{{ wp_sitename }}"
+    dest: "/etc/nginx/sites-enabled/{{ wp_sitename }}"
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Wordpress | Nginx | Suppression du Symlink par defaut des sites disponibles aux sites activés
+  file:
+    path: "/etc/nginx/sites-available/default"
+    state: absent
+  when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
+
+- name: Wordpress | Nginx | Modification de la ligne 62 du fichier nginx.conf
+  lineinfile:
+    path: "/etc/nginx/nginx.conf"
+    regexp: include \/etc\/nginx\/sites-enabled\/.*;
+    line: "include /etc/nginx/sites-enabled/*.*;"
+    state: present
+
+
+
+
+#ne marche pas avec molecule   
+#- name: Ajouter le serveur mysql à /etc/hosts
+#  lineinfile:
+#    path: "/etc/hosts"
+#   line: "{{ wp_mysql_ip }} {{ wp_mysql_host }}"
+
+# Molecule n'en tient même pas compte ;))
+- name : ajouter le serveur mysql à /etc/hosts
+  ansible.builtin.command: 'echo "{{ wp_mysql_ip }}  {{ wp_mysql_host }}" >> /etc/hosts'
+
+
+
+ 

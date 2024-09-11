@@ -1,0 +1,166 @@
+---
+# tasks file for wordpress
+
+
+# installation pour Ubuntu/Debian
+- name: WordPress | Installer php
+  apt:
+    pkg:
+      [
+        "php-pear",
+        "php-fpm",
+        "php-dev",
+        "php-zip",
+        "php-curl",
+        "php-xmlrpc",
+        "php-gd",
+        "php-mysql",
+        "php-mbstring",
+        "php-xml",
+      ]
+    update_cache: yes
+    cache_valid_time: 86400
+    state: present
+  when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
+
+#installation pour Redhat/CentOS/Rocky/Alma linux
+- name: Wordpress | Installer php
+  dnf:
+    pkg:
+      [
+        "php-pear",
+        "php-fpm",
+        "php-devel",
+        "php-zip",
+        "php-curl",
+       #"php-xmlrpc",
+        "php-gd",
+        "php-mysqlnd",
+        "php-mbstring",
+        "php-xml",
+      ]
+    update_cache: yes
+    state: present
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+
+
+#Installation pour Ubuntu/Debian
+- name: Wordpress | Installer nginx
+  apt:
+    pkg: nginx
+    update_cache: yes
+    cache_valid_time: 86400
+    state: present
+  when: wp_webserver == "nginx" and
+        ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
+
+#Installation pour CentOS/RedHat
+- name: Wordpress | Installer nginx
+  dnf:
+    name: [ 'nginx','epel-release' ]
+    update_cache: yes
+    state: present
+  when: wp_webserver == "nginx" and
+        ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+
+- name: WordPress | Supprimer des éléments de /var/www/html/
+  file:
+    path: /var/www/html/index.html
+    state: absent
+  when: wp_install_dir == "/var/www/html"
+
+- name: WordPress | Créer un répertoire
+  file:
+    path: "{{ wp_install_dir }}"
+    state: directory
+    mode: 0755
+
+- name: WordPress | Extraire l'archive dans{{ wp_install_dir }}
+  unarchive:
+    src: "http://wordpress.org/wordpress-{{ wp_version }}.tar.gz"
+    dest: "{{ wp_install_dir }}"
+    remote_src: yes
+    creates: "{{ wp_install_dir }}/wordpress/wp-settings.php" 
+
+- name: WordPress | Déplacer les fichiers de {{ wp_install_dir }}/wordpress à {{ wp_install_dir }}
+  command: cp -rf . "{{ wp_install_dir }}"
+  args:
+    chdir: "{{ wp_install_dir }}/wordpress/"
+    creates: "{{ wp_install_dir }}/index.php"
+
+- name: WordPress | Supprimer le répertoire wordpress
+  file:
+    path: "{{ wp_install_dir }}/wordpress/"
+    state: absent
+
+- name: WordPress | Récupérer des sels aléatoires pour wp-config.php
+  delegate_to: localhost
+  uri:
+    url: https://api.wordpress.org/secret-key/1.1/salt/
+    return_content: yes
+  become: False
+  register: "wp_salt_array"
+
+- name: définir le fait wp_salt
+  set_fact:
+    wp_salt: "{{ wp_salt_array.content }}"
+
+- name: WordPress | Copy wp-config.php if it does not exist or has changed
+  block:
+    - name: Check if wp-config.php exists
+      stat:
+        path: "{{ wp_install_dir }}/wp-config.php"
+      register: wp_config_exists
+
+- name: WordPress | Copiez le fichier wp-config.php
+  template:
+    src: wp-config.php.j2
+    dest: "{{ wp_install_dir }}/wp-config.php"
+  when: wp_config_exists == false
+
+#Pour Ubuntu/debian
+- name: WordPress | Changer le propriétaire du répertoire d'installation
+  file:
+    path: "{{ wp_install_dir }}"
+    owner: www-data
+    group: www-data
+    state: directory
+    recurse: yes
+  when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
+- include_tasks: nginx.yml
+  when: wp_webserver == "nginx" 
+        
+
+#Pour CentOS/RedHat
+- name: WordPress | Changer le propriétaire du répertoire d'installation
+  file:
+    path: "{{ wp_install_dir }}"
+    owner: nginx
+    group: nginx
+    state: directory
+    recurse: yes
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'  
+- include_tasks: nginx.yml
+  when: wp_webserver == "nginx" 
+
+
+#installation des dépendances pour Ubuntu/Debian
+- name: Installation des dépendances
+  apt:
+    pkg: ["php-mysql", "python3-pymysql"]
+    update_cache: yes
+    cache_valid_time: 86400
+    state: present
+  notify:
+    - restart {{ wp_webserver }}
+  when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
+
+#installation des dependances pour CentOS/RedHat
+- name: Installation des dépendances
+  dnf:
+    name: ["php-mysql", "python3-pymysql"]
+    update_cache: yes
+    state: present
+  notify:
+    - restart {{ wp_webserver }}
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'

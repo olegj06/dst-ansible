@@ -1,0 +1,17 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: mysql_instance
+    hostname: "mariadb-server.jobs.fr"
+    #image: quay.io/centos/centos:stream9
+    image: geerlingguy/docker-ubuntu2204-ansible:latest
+    pre_build_image: true
+provisioner:
+  name: ansible
+      
+verifier:
+  name: testinfra
+

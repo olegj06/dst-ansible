@@ -1,0 +1,9 @@
+all:
+  children:
+    mysql:
+      hosts:
+        mariadb-server.jobs.fr:
+    ungrouped: {}
+    wordpress:
+      hosts:
+        wordpress-server.jobs.fr:

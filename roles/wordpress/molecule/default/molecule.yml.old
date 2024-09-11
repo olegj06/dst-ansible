@@ -1,0 +1,15 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: instance
+    #image: quay.io/centos/centos:stream9
+    image: geerlingguy/docker-ubuntu2004-ansible:latest
+    pre_build_image: true
+provisioner:
+  name: ansible
+  playbook: "~/exam-ansible/install_wordpress_mysql.yml"
+verifier:
+  name: testinfra

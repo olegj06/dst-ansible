@@ -1,0 +1,7 @@
+---
+# handlers file for wordpress
+- name: restart nginx
+  ansible.builtin.sysvinit:
+    name: nginx
+    state: restarted
+
